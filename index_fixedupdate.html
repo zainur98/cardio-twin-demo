@@ -23,7 +23,7 @@
   .big{font-size:22px;font-weight:700}
   .tiny{font-size:12px;color:#94a3b8}
   .wfwrap{position:relative}
-  canvas{width:100%;height:260px;background:#050a16;border:1px solid #1f2937;border-radius:12px}
+  canvas{display:block;width:100%;height:260px;background:#050a16;border:1px solid #1f2937;border-radius:12px}
   .ylabel{position:absolute;left:6px;transform:translateY(50%);font-size:11px;color:#94a3b8;background:transparent}
   .label-0{bottom:8px}
   .label-50{bottom:calc(8px + 25% - 7px)}
@@ -34,15 +34,16 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Digital Twin Demo - Madeeha Nayeem</h1>
+  <h1>Tuned Hemodynamics (Baseline ≈ 120/80) — Fixed 0–200 mmHg Scale</h1>
   <div class="grid">
     <section class="card">
-      <h2>Digital Heart</h2>
+      <h2>3D / AR Viewer</h2>
       <model-viewer id="mv" src="realistic_human_heart.glb" ar camera-controls auto-rotate shadow-intensity="1" exposure="1.1"></model-viewer>
+      <div style="margin-top:8px"><a class="tiny" href="#" id="swapModel">Use heart model URL</a></div>
     </section>
 
     <section class="card">
-      <h2>Add Inputs and Meds</h2>
+      <h2>Twin Inputs & Meds</h2>
       <div class="row"><div>Heart Rate (bpm): <strong id="hrVal">70</strong></div><input id="hr" type="range" min="40" max="160" value="70" step="1"></div>
       <div class="row"><div>Contractility: <strong id="inoVal">1.00×</strong></div><input id="ino" type="range" min="0.6" max="1.6" value="1.0" step="0.01"></div>
       <div class="row"><div>Resistance (TPR): <strong id="resVal">1.00×</strong></div><input id="res" type="range" min="0.5" max="1.8" value="1.0" step="0.01"></div>
@@ -65,6 +66,7 @@
         <div class="ylabel label-100">100</div>
         <div class="ylabel label-50">50</div>
         <div class="ylabel label-0">0</div>
+        <div class="tiny">Fixed scale with color zones: MAP &lt; 60 (red), 60–120 (green), &gt;120 (yellow).</div>
       </div>
     </section>
   </div>
@@ -123,61 +125,16 @@
     const yScale=(H-2*pad)/(yMax-yMin);
     const toY = (p)=> H - pad - (p - yMin) * yScale;
 
-
-    // --- FORCE REDRAW after layout / on mobile visibility / orientation / scroll / context restore
-function safeUpdate() {
-  // Wait until canvas actually has size
-  if (!canvas || canvas.clientWidth === 0 || canvas.clientHeight === 0) {
-    requestAnimationFrame(safeUpdate);
-    return;
-  }
-  resize();
-  update();
-}
-
-// 1) First paint after full layout
-document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(safeUpdate));
-window.addEventListener('load', safeUpdate);
-
-// 2) When tab/app becomes visible again
-document.addEventListener('visibilitychange', () => { if (!document.hidden) safeUpdate(); });
-
-// 3) Mobile: when page is restored from bfcache
-window.addEventListener('pageshow', (e) => { if (e.persisted) safeUpdate(); });
-
-// 4) Orientation changes (portrait <-> landscape)
-window.addEventListener('orientationchange', () => setTimeout(safeUpdate, 0));
-
-// 5) Throttled redraw on scroll (some browsers recycle canvases off-screen)
-let _ticking = false;
-window.addEventListener('scroll', () => {
-  if (_ticking) return;
-  _ticking = true;
-  requestAnimationFrame(() => { safeUpdate(); _ticking = false; });
-}, { passive: true });
-
-// 6) Handle GPU context loss (Safari/WebKit)
-canvas.addEventListener('contextlost', (e) => { e.preventDefault(); });
-canvas.addEventListener('contextrestored', safeUpdate);
-
-// Optional: also kick once more right away (helps GH Pages first load)
-requestAnimationFrame(safeUpdate);
-
-
-    // Zones
     ctx.fillStyle='rgba(239,68,68,0.10)'; ctx.fillRect(0,toY(60),W,toY(0)-toY(60));
     ctx.fillStyle='rgba(34,197,94,0.06)'; ctx.fillRect(0,toY(120),W,toY(60)-toY(120));
     ctx.fillStyle='rgba(245,158,11,0.08)'; ctx.fillRect(0,toY(200),W,toY(120)-toY(200));
 
-    // Grid lines
     ctx.strokeStyle='rgba(148,163,184,0.28)'; ctx.lineWidth=1; ctx.beginPath();
     [0,50,100,150,200].forEach(v=>{const y=toY(v); ctx.moveTo(0,y); ctx.lineTo(W,y);}); ctx.stroke();
 
-    // MAP dashed line
     ctx.strokeStyle='rgba(147,197,253,0.8)'; ctx.setLineDash([4,4]); ctx.beginPath();
     const yMAP=toY(MAP); ctx.moveTo(0,yMAP); ctx.lineTo(W,yMAP); ctx.stroke(); ctx.setLineDash([]);
 
-    // Trace
     ctx.lineWidth=2; ctx.strokeStyle='#22d3ee'; ctx.beginPath();
     for(let i=0;i<Ps.length;i++){const x=i*(W/Ps.length); const y=toY(Ps[i]); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.stroke();
   }
@@ -190,6 +147,30 @@ requestAnimationFrame(safeUpdate);
   ['input','change'].forEach(ev=>[hr,ino,res,comp,bb,ace,diu].forEach(el=>el.addEventListener(ev,update)));
   swapModelBtn.addEventListener('click',e=>{e.preventDefault();const url=prompt("Paste a GLB URL");if(url){mv.src=url;}});
   update();
+
+  // --- FIX: force redraw after load, on visibility/orientation/scroll/context restore
+  function safeUpdate() {
+    if (!canvas || canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+      requestAnimationFrame(safeUpdate);
+      return;
+    }
+    resize();
+    update();
+  }
+  document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(safeUpdate));
+  window.addEventListener('load', safeUpdate);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) safeUpdate(); });
+  window.addEventListener('pageshow', (e) => { if (e.persisted) safeUpdate(); });
+  window.addEventListener('orientationchange', () => setTimeout(safeUpdate, 0));
+  let _ticking = false;
+  window.addEventListener('scroll', () => {
+    if (_ticking) return;
+    _ticking = true;
+    requestAnimationFrame(() => { safeUpdate(); _ticking = false; });
+  }, { passive: true });
+  canvas.addEventListener('contextlost', (e) => { e.preventDefault(); });
+  canvas.addEventListener('contextrestored', safeUpdate);
+  requestAnimationFrame(safeUpdate);
 })();
 </script>
 </body>
