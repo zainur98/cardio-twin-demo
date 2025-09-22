@@ -30,6 +30,18 @@
   .label-100{bottom:calc(8px + 50% - 7px)}
   .label-150{bottom:calc(8px + 75% - 7px)}
   .label-200{top:8px}
+
+.intro {
+  background: #0f172a;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #e5e7eb;
+}
+
 </style>
 </head>
 <body>
@@ -60,6 +72,7 @@
 
     <section class="card">
       <h2>Twin Inputs & Meds</h2>
+      
       <div class="row"><div>Heart Rate (bpm): <strong id="hrVal">70</strong></div><input id="hr" type="range" min="40" max="160" value="70" step="1"></div>
       <div class="row"><div>Contractility: <strong id="inoVal">1.00×</strong></div><input id="ino" type="range" min="0.6" max="1.6" value="1.0" step="0.01"></div>
       <div class="row"><div>Resistance (TPR): <strong id="resVal">1.00×</strong></div><input id="res" type="range" min="0.5" max="1.8" value="1.0" step="0.01"></div>
@@ -67,6 +80,9 @@
       <label><input id="bb" type="checkbox"> β-Blocker</label>
       <label><input id="ace" type="checkbox"> ACEi/ARB</label>
       <label><input id="diu" type="checkbox"> Diuretic</label>
+
+
+      
 
       <div class="kpi">
         <div class="box"><div class="tiny">CO</div><div class="big" id="coOut">—</div><div class="tiny">L/min</div></div>
