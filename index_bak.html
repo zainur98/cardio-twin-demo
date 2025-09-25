@@ -4,9 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b1220">
-
-<title>BRIDGING VIRTUAL AND REAL; THE ROLE OF HEALTH DIGITAL TWINS AND EXTENDED REALITY IN CARDIOVASCULAR CARE</title>
+<title>Digital Twin Demo - Madeeha Nayeem</title>
 <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 <style>
   :root{--bg:#0b1220;--panel:#0f172a;--ink:#e5e7eb;--muted:#94a3b8;--accent:#22d3ee;--good:#22c55e;--warn:#f59e0b;--bad:#ef4444;}
@@ -44,10 +42,10 @@
                  /* moves it up so it sits inside the box, just above border */
   left:50%;
   transform:translateX(-50%);
-  font-size:13px;
+  font-size:12px;
   font-weight:600;
   color:#e5e7eb;
-} 
+}
 
 
   .label-0{bottom:8px}
@@ -127,7 +125,7 @@
     <section class="card">
       <h2>Twin Inputs & Meds</h2>
       
-      <div class="row"><div>Heart Rate (bpm): <strong id="hrVal">70</strong></div><input id="hr" type="range" min="40" max="160" value="70" step="1" ></div>
+      <div class="row"><div>Heart Rate (bpm): <strong id="hrVal">70</strong></div><input id="hr" type="range" min="40" max="160" value="70" step="1"></div>
       <div class="row"><div>Contractility: <strong id="inoVal">1.00×</strong></div><input id="ino" type="range" min="0.6" max="1.6" value="1.0" step="0.01"></div>
       <div class="row"><div>Resistance (TPR): <strong id="resVal">1.00×</strong></div><input id="res" type="range" min="0.5" max="1.8" value="1.0" step="0.01"></div>
       <div class="row"><div>Compliance: <strong id="compVal">1.00×</strong></div><input id="comp" type="range" min="0.5" max="1.5" value="1.0" step="0.01"></div>
@@ -237,9 +235,6 @@
     hrVal.textContent=hr.value; inoVal.textContent=(+ino.value).toFixed(2)+'×'; resVal.textContent=(+res.value).toFixed(2)+'×'; compVal.textContent=(+comp.value).toFixed(2)+'×';
     resize();
     const s=simulate(4);
-    // Save simulation stats globally so heartbeat can use PP
-    window._lastStats = s;
-
     draw(s.Pseries,s.MAP);
     coOut.textContent=fmt(s.CO,2); mapOut.textContent=fmt(s.MAP,0); bpOut.textContent=fmt(s.SBP,0)+' / '+fmt(s.DBP,0); ppOut.textContent=fmt(s.PP,0);
   }
@@ -291,49 +286,42 @@ if (swapModelBtn) {
   const mvEl = document.getElementById('mv');
 
 
-function tick(ts){
-  if (lastTs == null) lastTs = ts;
-  const dt = (ts - lastTs) / 1000;  // seconds
-  lastTs = ts;
+  function tick(ts){
+    if(lastTs == null) lastTs = ts;
+    const dt = (ts - lastTs) / 1000; // seconds
+    lastTs = ts;
 
-  // Beat period from med-adjusted HR
-  const meds = (typeof applyMeds === 'function') ? applyMeds() : { HR: (+document.getElementById('hr')?.value || 70) };
-  const HR   = Math.max(40, Math.min(200, meds.HR));
-  const T    = Math.max(0.3, 60 / HR);
+    // Use your existing med-adjusted HR so β-blocker etc. affect the beat speed:
+    const { HR } = (typeof applyMeds === 'function') ? applyMeds() : { HR: +document.getElementById('hr').value || 70 };
+    const T = Math.max(0.3, 60 / Math.max(40, Math.min(200, HR))); // period (s), clamp HR 40..200
 
-  // Advance phase 0..1
-  phase = (phase + dt / T) % 1;
+    // Advance phase
+    phase = (phase + dt / T) % 1;
 
-  // Systolic envelope (0..1)
-  const systole = Math.sin(Math.PI * phase);
-  const shaped  = Math.max(0, systole * systole);
+    // Shape: quick systolic up, slower diastolic decay
+    // Use a squared-sine to emphasize the upstroke without going negative
+    const systole = Math.sin(Math.PI * phase);
+    const shaped = Math.max(0, systole * systole); // 0..1
 
-  // --- Amplitude from Pulse Pressure (PP), with gentle HR damping ---
-  const stats = window._lastStats;
-  const ppRaw = (stats && Number.isFinite(stats.PP)) ? stats.PP : 50; // fallback PP
-  const pp    = Math.max(20, Math.min(100, ppRaw));                   // clamp 20..100
+    // Amplitude: slightly larger pulse when compliance is low (stiffer arteries)
+    const comp = document.getElementById('comp') ? +document.getElementById('comp').value : 1.0;
+    const baseAmp = 0.02;                // 2% scale at baseline
+    const extraFromStiffness = (1 - Math.min(Math.max(comp, 0.5), 1.5)) * 0.02; // up to +2%
+    const amp = baseAmp + extraFromStiffness; // ~2–4%
 
-  // Map PP 20–100 → 2.5%–4.0% (slightly stronger base so it’s noticeable)
-  let amp = 0.025 + (pp - 20) * (0.040 - 0.025) / (100 - 20);
+    const s = 1 + amp * shaped;          // scale factor
+    mvEl.style.transform = `scale(${s})`;
+    
 
-  // Reduce amplitude modestly at very high HR (90→160 bpm gives up to −30%)
-  const hrDamp = 1 - 0.30 * Math.max(0, Math.min(1, (HR - 90) / 70));
-  amp *= hrDamp;
 
-  // Apply scale
-  if (mvEl) {
-    const scale = 1 + amp * shaped;
-    mvEl.style.transform = `scale(${scale})`;
 
-    // Optional exposure pulse
+    // (Optional) tiny exposure pulse for “alive” look (keep subtle)
     if (typeof mvEl.exposure === 'number') {
       mvEl.exposure = 1.0 + 0.12 * shaped;
     }
+
+    requestAnimationFrame(tick);
   }
-
-  requestAnimationFrame(tick);
-}
-
   requestAnimationFrame(tick);
 
 })();
