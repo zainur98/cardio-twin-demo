@@ -42,7 +42,18 @@
   color: #e5e7eb;
 }
 
-
+.viewerWrap{
+  position: relative;
+  height: min(60vh, 520px);      /* fixed area so scaling doesn’t reflow the page */
+  border-radius: 12px;
+  overflow: hidden;
+}
+.viewerWrap model-viewer{
+  position: absolute;
+  inset: 0;                      /* fill the wrapper */
+  transform-origin: center center;
+  will-change: transform;
+}
 </style>
 </head>
 <body>
@@ -68,7 +79,11 @@
   <div class="grid">
     <section class="card">
       <h2>Digital Heart</h2>
+      <div class="viewerWrap">
+     <div class="viewerWrap">
+
       <model-viewer id="mv" src="realistic_human_heart.glb"  camera-controls auto-rotate shadow-intensity="1" exposure="1.1"></model-viewer>
+        </div>
 
     </section>
 
@@ -211,6 +226,50 @@
   canvas.addEventListener('contextrestored', safeUpdate);
 
   requestAnimationFrame(safeUpdate);
+
+// --- Heartbeat animation synced to HR slider ---
+(function makeHeartbeat(){
+  let lastTs = null;
+  let phase = 0; // 0..1 within a beat
+  const mvEl = document.getElementById('mv');
+
+  function tick(ts){
+    if(lastTs == null) lastTs = ts;
+    const dt = (ts - lastTs) / 1000; // seconds
+    lastTs = ts;
+
+    // Use your existing med-adjusted HR so β-blocker etc. affect the beat speed:
+    const { HR } = (typeof applyMeds === 'function') ? applyMeds() : { HR: +document.getElementById('hr').value || 70 };
+    const T = Math.max(0.3, 60 / Math.max(40, Math.min(200, HR))); // period (s), clamp HR 40..200
+
+    // Advance phase
+    phase = (phase + dt / T) % 1;
+
+    // Shape: quick systolic up, slower diastolic decay
+    // Use a squared-sine to emphasize the upstroke without going negative
+    const systole = Math.sin(Math.PI * phase);
+    const shaped = Math.max(0, systole * systole); // 0..1
+
+    // Amplitude: slightly larger pulse when compliance is low (stiffer arteries)
+    const comp = document.getElementById('comp') ? +document.getElementById('comp').value : 1.0;
+    const baseAmp = 0.02;                // 2% scale at baseline
+    const extraFromStiffness = (1 - Math.min(Math.max(comp, 0.5), 1.5)) * 0.02; // up to +2%
+    const amp = baseAmp + extraFromStiffness; // ~2–4%
+
+    const s = 1 + amp * shaped;          // scale factor
+    mvEl.style.transform = `scale(${s})`;
+
+    // (Optional) tiny exposure pulse for “alive” look (keep subtle)
+    if (typeof mvEl.exposure === 'number') {
+      mvEl.exposure = 1.0 + 0.12 * shaped;
+    }
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+
+
 })();
 </script>
 </body>
